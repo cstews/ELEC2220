@@ -1,0 +1,35 @@
+;Courtney Stewart
+;ELEC2220
+;Coding Homework 6 Question 1
+
+	AREA RESET, CODE
+	THUMB
+	ENTRY
+	
+Main
+
+	ldr r0, =xValue			;load x into r0
+	ldrb r1, [r0]			;load value into r1
+	mov r8, #0x04			;put 4 into r8
+	
+	mul r2, r1, r8			;multiply 4x and store in r2
+ 
+	
+	ldrb r4, [r0]			;put x into r4
+	
+	lsl r3, r2, r4			;multiply 4x by 2^x
+	
+	ldr r5, =yValue			;load in yValue
+	strb r3, [r5]			;store yValue
+	
+
+	b .
+
+
+	AREA MyData, DATA
+yValue dcb 0		;store y
+xValue dcb 1		;store x
+		
+	
+	
+	END
