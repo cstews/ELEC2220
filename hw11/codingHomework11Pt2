@@ -1,0 +1,167 @@
+;Courtney Stewart
+;ELEC2220
+;Homework 11 Part 2
+
+
+	GET Equates.s
+
+
+	AREA timers, CODE
+	ENTRY
+	EXPORT __main
+
+	EXPORT TIM4_IRQHandler
+	 
+__main	PROC
+	bl output_init				;set up GPIOD 12-15 for LEDs
+	bl TIM4_Init				;set up the timer interrupt
+	
+	;the counter for the light toggle needs to start at 0
+	ldr r0, =counter
+	mov r1, #0
+	strb r1, [r0]
+	
+	;counter for blue light starts at 0
+	ldr r2, =blueCounter
+	mov r3, #0
+	strb r3, [r2]
+	
+	;counter for green light starts at 0
+	ldr r4, =greenCounter
+	mov r5, #0
+	strb r5, [r4]
+	
+
+	b .							
+								
+								
+	ENDP
+;=====================================================
+TIM4_IRQHandler	PROC
+	push	{lr}		
+	ldr		r0,=TIM4
+	ldr		r1,[r0,#SR]			;Read SR
+	bic		r1,#0x0001			;Clear UIF (flag)
+	str		r1,[r0,#SR]			;Update SR
+
+
+;red light should blink each time
+	ldr		r0,=GPIOD			;State of GPIOD output
+	ldr		r1,[r0, #ODR]		;Read state
+	eor		r1,#0x4000			;toggle value of red
+	str		r1,[r0, #ODR]		;store it back
+	
+	b OrangeToggle
+	
+	
+;orange should blink every other time
+OrangeToggle
+	ldr r0, =counter
+	ldrb r1, [r0]
+	eor r1, #1		;toggle counter 0 to 1, 1 to 0, 0 to 1, etc.
+	strb r1, [r0]	;save new value	
+	cmp	r1, #0		;if it's 0, don't toggle
+	beq ExitTimer
+	;if it's a 1, do toggle
+	ldr		r0,=GPIOD			;State of GPIOD output
+	ldr		r1,[r0, #ODR]		;Read state
+	eor		r1,#0x2000			;toggle value of red
+	str		r1,[r0, #ODR]		;store it back	
+	
+	;blue should blink every other time orange blinks
+	ldr r0, =blueCounter
+	ldrb r1, [r0]				;load in blue counter
+	add r1, #1					;add 1 to blue counter
+	strb r1, [r0]				;store back counter value
+	
+	cmp r1, #3					
+	beq GreenToggle				;if counter is 3 toggle green
+	cmp r1, #4
+	beq BlueToggle				;if counter is 4 toggle blue
+	
+	
+	b ExitTimer					;if here, exit
+	
+	
+;green should blink every 3 times
+GreenToggle
+	ldr		r0,=GPIOD			;State of GPIOD output
+	ldr		r1,[r0, #ODR]		;Read state
+	eor		r1,#0x1000			;toggle value of green
+	str		r1,[r0, #ODR]		;store it back	
+	ldr r0, =greenCounter
+	ldrb r1, [r0]
+	mov r1, #0					;reset green counter
+	strb r1, [r0]				;save new value
+	b ExitTimer
+
+;blue should blink every 4 times
+BlueToggle
+	ldr		r0,=GPIOD			;State of GPIOD output
+	ldr		r1,[r0, #ODR]		;Read state
+	eor		r1,#0x8000			;toggle value of green
+	str		r1,[r0, #ODR]		;store it back	
+	ldr r0, =blueCounter
+	ldrb r1, [r0]
+	mov r1, #0					;reset counter
+	strb r1, [r0]				;save new value
+	b ExitTimer
+
+
+
+ExitTimer
+	pop		{lr}
+	bx		lr					;Return from interrupt
+	ENDP
+
+;===========================================
+;   Initialize TIM4
+TIM4_Init	PROC
+	;enable the clock to TIM4 
+	ldr		r0,=RCC				;Clock control
+	ldr		r1,[r0,#APB1ENR]	;APB1 clock enable bits
+	orr		r1,#TIM4EN			;Enable TIM4 clock
+	str		r1,[r0,#APB1ENR]	;Update APB1
+
+
+	ldr		r0,=TIM4			;TIM4 registers
+	mov		r1,#PSCVal		;Prescale for waveform generation
+	str		r1,[r0,#PSC]		;
+	mov		r1,#ARRVal				;Auto-Repeat for waveform generation
+	str		r1,[r0,#ARR]		;
+	mov		r1,#1				;Counter Enable (CEN)
+	str		r1,[r0,#CR1]		;Enable the counter
+	str		r1,[r0,#DIER]		;Enable the counter interrupt
+	
+	; Enable TIM4 interrupt in NVIC	
+	ldr		r0,=NVIC_ISER0		;NVIC_ISER0 enable registers
+	mov		r1,#1
+	lsl		r1,#TIM4_BIT		;TIM4 enable bit
+	str		r1,[r0,#TIM4_OFF]	;enable TIM4 interrupt
+	bx		lr					;return
+	ENDP
+
+output_init	PROC
+	ldr r0, =RCC				;load RCC to set up clock
+	ldr r1, [r0, #AHB1ENR]		;RCC offset for output
+	orr r1, #0x08				;enable GPIOD clock
+	str r1, [r0, #AHB1ENR]		;store back to update AHB1ENR
+	
+	ldr r0, =GPIOD				;load GPIOD to set up output
+	ldr r1, [r0, #MODER]		;offset GPIOD by MODER constant	
+	bic r1, #0xFF000000			;clear PD 15-12 bits 
+	orr r1, #0x55000000			;set PD 15-12 to use as outputs 
+	str r1, [r0, #MODER]		;update mode register
+
+	ldrh r1, [r0, #ODR]
+	bic r1, #0xF000				;clear the lights' ODR bits (turn them off)
+	strh r1, [r0, #ODR]
+
+	bx LR
+	ENDP
+
+	AREA mydata, DATA
+counter dcb 0x00
+blueCounter dcb 0x00
+greenCounter dcb 0x00
+	END
