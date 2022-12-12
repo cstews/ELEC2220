@@ -1,0 +1,106 @@
+;Courtney Stewart
+;ELEC2220
+;Coding Homework 8
+
+
+	AREA RESET, CODE
+	THUMB
+	ENTRY
+
+;main is question 3 on hw
+Main
+	ldr r7, =X_data		;load in X_data to r7
+	ldr r8, =Y_data		;load in Y_data to r8
+	
+	ldrb r0, [r7]		;load in x value to r0
+	ldrb r1, [r8]		;load in y value to r1
+	
+	push {r0} 			;push y value
+	push {r1}			;push x value
+	
+	bl big_math			;call big_math subroutine
+	
+	ldr r9, =Z_data		;load in Z_data to r9
+	
+	pop {r4}			;pop z into r4
+	
+	str r4, [r9]		;store z into Z_data
+	
+	b .
+	
+	
+;this is question 1 on the hw
+x_to_y
+	mov r0, #1			;need this for PowerLoop
+
+	;special cases
+	cmp r2, #6			;compare y to 6
+	bgt GreaterThan6	;branch to take care of it
+	
+	cmp r1, #6			;compare x to 6
+	bgt GreaterThan6	;branch to take care of it
+	
+	cmp r2, #0			;check if y is zero
+	beq YIsZero			;if it is, branch
+
+;actual math now
+PowerLoop
+	cmp r2, #0			;see if counter (y) is zero
+	beq Done			;if is, done multiplying
+	
+	mul r0, r1			;first time r3 will be x, then will multiply
+						;by x again next time
+	sub r2, #1			;decrement y value
+	b PowerLoop			;loop back again
+
+
+GreaterThan6
+	mov r0, #0		;if either is greater than 6 return 0
+	b Done			;branch to Done
+	
+YIsZero
+	mov r0, #1		;if y is zero answer will be 1
+	b Done			;branch to Done
+	
+Done
+	bx LR			;if done, go back
+
+
+
+
+;this is question 2 
+big_math
+	pop {r2}			;pop y value into r2
+	pop {r1}			;pop x value into r1
+	
+	push {LR}			;need to push link register so it doesn't get lost in the sauce
+	
+	bl x_to_y			;go to x_to_y subroutine to get that value
+						;value should be in r0
+	
+	mov r6, #0x03		;move 3 into r6 for division
+	sdiv r4, r1, r6		;divide x by 3 and save in r4
+
+	mov r6, #0x04		;move 4 into r6 for division
+	sdiv r5, r2, r6		;divide y by 4 and save in r5
+	
+	sub r3, r0, r4		;subtract x/3 from x^y and store in r3
+	
+	add r3, r5			;add previous value to y/4
+	
+	sub r4, r3, #33		;subtract 33 from previous answer and store in r4						
+						
+	pop {LR}			;retrieve link register
+	
+	push {r4}			;push equation answer onto stack
+	
+	
+	bx LR				;exit back to main
+	
+	
+	AREA MyData, DATA
+X_data dcd 0x01
+Y_data dcd 0x01
+Z_data dcd 0
+
+	END
