@@ -1,0 +1,48 @@
+;Coding HW 2
+;Try building the code below; as written, it will cause four errors.
+;Using the class notes and the error cheat sheet (under Files on Canvas),
+;fix these errors and make a note of what you did (just leave a comment
+;saying what you changed).  Each fixed error is worth 0.2 points.
+
+;Then, step through your newly working code using the debugger and
+;answer the six questions written in the comments of the given
+;code regarding register values and stored numbers.  Each of these
+;questions is also worth 0.2 points each.
+
+
+	AREA RESET, CODE
+	THUMB
+	ENTRY
+
+Main
+
+	ldr r0, =Stuff0
+	ldrb r1, [r0]			;1) what value will be in r1 after this executes?
+								;0x00000000
+	
+	mov r2, #0xB2		;added 0x to front
+	add r1, r2				;2) what value will be in r1 after this executes?
+								;0x000000B2
+	strb r1, [r0, #4]		;3) where is r1 stored?  What was overwritten?	
+								;It isn't stored since this is the CODE section. The 0x000000B2 was overwritten
+	
+	ldr r1, =Stuff2		;changed # to =
+	ldr r0, [r1]
+	ldr r2, [r1], #4	
+	subs r2, r0				;4) what will the flags be after this executes?
+								;Z=1, C=1, N=0, V=0
+	
+	ldr r0, =Stuff1			;5) what byte is stored in the address to which Stuff1 points?
+								;00
+	str r2, [r0]		;put destination in brackets
+
+							;6) what values are stored in Stuff0, 1, and 2 now?
+								;nothing
+	
+	b . 				;added indention
+		
+Stuff0 dcb 0, 4, 5, 3
+Stuff1 dcd 0x43210011
+Stuff2 dcd 0x22, 22
+	
+	END
