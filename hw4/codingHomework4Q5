@@ -1,0 +1,83 @@
+;Courtney Stewart
+;ELEC2220
+;Homework 4 Coding Question 5
+
+	AREA RESET, CODE
+	THUMB
+	ENTRY
+Main
+	;load in string
+	ldr r0, =string
+	
+	;counter for total characters
+	mov r1, #0
+	
+	;counter for non-letter characters
+	mov r2, #0
+	
+Loop
+	;load in first value of string
+	ldr r3, [r0], #4
+	
+	;check to see if zero
+	cmp r3, #0x00
+	;if it is, we're done
+	beq done
+	
+	;if not zero, increment total characters
+	add r1, #1
+	
+	;compare to hex number for A
+	cmp r3, #0x41
+	;if less than, is a non-letter and can move on
+	blt CounterForNonLetterIncreaser
+	
+	
+	;now check with hex number for Z
+	cmp r3, #0x5a
+	;if less than, we know it's between A-Z and don't want to count it
+	;so we move onto next value
+	blt Loop
+	
+	;if we've made it here, need to check if it's a lowercase letter
+	;compare value to hex for a
+	cmp r3, #0x61
+	;if it is less than, we know it's not a letter and we want to count it
+	blt CounterForNonLetterIncreaser
+	
+	;now check if greater than hex value for z
+	cmp r3, #0x7a
+	;if it's greater than, it's a non-letter and want to count it
+	bgt CounterForNonLetterIncreaser
+
+	
+CounterForNonLetterIncreaser
+	;increment non-letter counter
+	add r2, #1
+	;can move onto next character
+	b Loop
+	
+	
+done
+	;should be done counting and just move values into registers
+	;load total count into register 4
+	ldr r4, =totalCount
+	;store total number of characters into first byte of array
+	strb r1, [r4]
+	
+	;load count of non-letter characters into register 5
+	ldr r5, =nonLetterCount
+	;store number of non-letter characters into second byte of array
+	strb r2, [r0]
+	
+	b .
+	
+	;copied example from September 16th example
+	;mainly because I liked 0xBEEFBEEF
+string dcd 0x5e, 0x32323232, 0x9982, 0x33, 0xBEEFBEEF, 0x00
+	
+	AREA MyData, DATA
+totalCount dcb 0
+nonLetterCount dcb 0
+
+	END
