@@ -1,0 +1,44 @@
+;Courtney Stewart
+;ELEC2220
+;Coding Homework 7
+
+	AREA RESET, CODE
+	THUMB
+	ENTRY
+	
+Main
+	ldr r0, =Thing1			;loads in Thing1
+	
+PushValues	
+	ldrb r1, [r0], #1		;load in next value of Thing1
+	cmp r1, #0x00			;see if value of r1 is zero
+	beq PopValues			;if zero, branch to the popping portion					
+							;if here, not null value
+	push{r1}				;push onto stack
+							;loop back to check next value
+	b PushValues
+	
+	
+PopValues				;if here, all non-null values are pushed onto stack
+	ldr r0, =Thing2		;done with Thing1 so can load in Thing2
+	
+PopLoop
+	pop{r1}				;pop what is at the top of the stack
+	cmp r1, #0x00		;see if popped value is zero
+	beq Done			;if is zero, done popping and can branch to done
+	
+	strb r1, [r0], #1	;store popped value into r2 and move to next spot in array
+	b PopLoop			;loop back to pop next value
+	
+Done
+	
+	b .
+	
+	
+	
+	AREA MyData, DATA
+Thing1 dcb 5, 6, 7, 8, 0
+Thing2 dcb 0
+
+	END
+
