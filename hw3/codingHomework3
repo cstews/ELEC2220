@@ -1,0 +1,46 @@
+;Coding Homework 3
+;Courtney Stewart
+;ELEC2220
+
+	AREA RESET, CODE
+	THUMB
+	ENTRY
+	
+	
+Main
+
+	;store starting address of Array1 in r0
+	ldr r0, =Array1
+	
+	;post index
+	ldrb r1, [r0], #1
+	
+	;read in 3rd value of Array2 (0x4433) without changing base address
+	;base address in r2 and value needed in r4
+	ldr r2, =Array2		;Array2 base address in r3
+	add r3, r2, #12 		;getting 3rd byte of Array2
+	ldr r4, [r3]			;putting 3rd byte into r4
+	
+	;single line invert value in r4 and put in r1
+	mvn r1, r4				
+	
+	;put new r1 value into first value of Array2
+	str r1, [r2]			
+	
+	;overwrite 2nd value in Array1 (4) with 0x52 then third value (6) with deciaml 19
+	;hint r0 pointer?
+	mov r5, 0x52			;put 0x52 in r5
+	str r5, [r0, #1]		;store r5 in 2nd value of Array1
+	
+	mov r6, #19				;put decimal 19 in r6
+	str r6, [r0, #2]		;store r6 in the next value of Array1 (3rd)
+	
+	
+	
+	b .
+	
+	AREA MyData, DATA
+Array1 dcb 2, 4, 6, 0xFF
+Array2 dcd -1, -5, 0x4433, 0x2211
+	END
+	
