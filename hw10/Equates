@@ -1,0 +1,39 @@
+;this is for the clock setup when enabling the GPIO
+RCC EQU 0x40023800 		;base address for RCC
+AHB1ENR EQU 0x30 		;offset for this
+;this is for GPIO setup
+GPIOA EQU 0x40020000	;base address for PA# stuff
+GPIOD EQU 0x40020C00	;base address for PD# stuff
+MODER EQU 0x00 			;mode selection register offset (it's 0)
+IDR EQU 0x10			;offset for InputDR in a GPIOx array
+ODR EQU 0x14 			;offset for OutputDR in a GPIOx array
+	
+;NVIC Registers
+NVIC_ISER0	EQU	0xE000E100	;Interrupt Set-Enable (0-7)
+NVIC_ICER0	EQU	0xE000E180	;Interrupt Clear-Enable (0-7)
+NVIC_ISPR0	EQU	0xE000E200	;Interrupt Set-Pending (0-7)
+NVIC_ICPR0	EQU	0xE000E280	;Interrupt Clear-Pending (0-7)
+NVIC_IABR0	EQU	0xE000E300	;Interrupt Active Bit (0-7)
+NVIC_IPR1	EQU	0xE000E404	;Interrupt Priority (0-59)
+STIR		EQU	0xE000EF00	;Software Tigger Interrupt
+
+;System Configuration Registers
+SYSCFG	EQU 0x40013800
+EXTICR1	EQU	0x08			;clock enables for GPIO ports
+	
+;External Interrupt Registers
+EXTI	EQU	0x40013C00
+IMR		EQU	0x00	;Interrupt Mask Register
+EMR		EQU	0x04	;Event Mask Register
+RTSR	EQU	0x08	;Rising Trigger Select
+FTSR	EQU	0x0C	;Falling Trigger Select
+SWIR	EQU	0x10	;Software Interrupt Event
+PR		EQU	0x14	;Pending Register
+
+GREEN	EQU 12
+RED	EQU 14
+ORANGE EQU 13
+BLUE EQU 15			
+
+	
+	END
