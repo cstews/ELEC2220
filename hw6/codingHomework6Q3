@@ -1,0 +1,44 @@
+;Courtney Stewart
+;ELEC2220
+;Coding Homework 6 Question 3
+
+
+	AREA RESET, CODE
+	THUMB
+	ENTRY
+	
+Main
+	;loops through 8 value byte array
+	;pack into single int
+	;only between 0-9
+	ldr r1, =Values			;load in Values into r1
+	mov r3, #0x00			;counter since can only execute 8 times
+	
+	
+ShiftLoop
+	ldrb r2, [r1], #4		;load in next value, post indexing
+	orr r0, r2				;put value into r0
+	add r3, #0x01			;add 1 to counter
+	cmp r3, #0x07			;check if counter exceeds 8
+	bgt Done				;if greater than 7, don't need to shift
+	
+	
+	lsl r0, #4				;move over for next value
+	b ShiftLoop				;if less than or equal, loop back again
+	
+
+Done
+	;if done branch here and don't shift left
+	
+	ldr r4, =Packed
+	str r0, [r4]
+	
+	b .
+	
+
+
+	AREA MyData, DATA
+Values dcb 4, 3, 0, 9, 5, 0, 6, 1
+Packed dcd 0
+
+	END
