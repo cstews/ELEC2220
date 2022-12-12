@@ -1,0 +1,166 @@
+;Courtney Stewart
+;ELEC2220
+;Coding Homework 5
+;Question 2
+
+
+	AREA RESET, CODE
+	THUMB
+	ENTRY
+	
+Main	
+
+	ldr r0, =X_value		;r0 is address of X_value
+	ldrb r1, [r0]			;r1 = X_value
+	;r2 is where Y will be
+	
+Y7Change
+	;x7 and x6 and-ed together
+	tst r1, #2_10000000		;testing x7 to be 1
+	beq Y7Clear				;if equal 0, Y7Clear
+	tst r1, #2_01000000 	;testing x6 to be 1
+	beq Y7Clear				;if equal 0, Y7Clear
+	;if didn't branch, set y7
+	orr r2, #2_10000000		;set y7 to equal 1
+	b Y7Done
+Y7Clear
+	bic r2, #2_10000000
+Y7Done
+
+
+Y6Change
+	;invert x5
+	tst r1, #2_00100000		;testing x5, if =0 go to branch to set
+	beq SetY6
+	;if here, Y6 needs to be cleared
+	bic r2, #2_01000000		;clear y6
+	b Y6Done
+SetY6
+	orr r2, #2_01000000		;set y6 to 1
+Y6Done
+
+	
+Y5Change
+	;x6 and x4 nand-ed together
+	tst r1, #2_01000000		;testing x6 to be 1
+	bne X4Check				;if 1, check x4 value
+	;if here, x6 equals 0, can set y5
+	orr r2, #2_00100000		;set y5
+	b Y5Done
+X4Check
+	tst r1, #2_00010000		;test value of x4
+	bne Y5Clear				;if also 1, clear
+	orr r2, #2_00100000		;if 0, can set
+	b Y5Done
+Y5Clear
+	bic r2, #2_00100000		;clear y5
+Y5Done
+
+
+Y4Change
+	;x4 and x3 and-ed together
+	tst r1, #2_00010000		;testing x4 to be 1
+	beq Y4Clear				;if equal 0, exit
+	tst r1, #2_00001000		;testing x3 to be 1
+	beq Y4Clear				;if equal 0, exit
+	;if din't branch set y4
+	orr r2, #2_00010000		;set y4 equal to 1
+	b Y4Done
+Y4Clear
+	bic r2, #2_00010000		;clear y4
+Y4Done
+
+
+Y3Change
+	;invert x3
+	tst r1, #2_00001000		;testing x3, if =0 go to branch to change
+	beq SetY3
+	;if here, clear y3
+	bic r2, #2_00001000		;clear y3
+	b Y3Done
+SetY3
+	orr r2, #2_00001000		;set y3 to 1
+Y3Done
+
+
+Y2Change
+	;inverted x2 or-ed with x1
+	;invert x2 first
+	tst r1, #2_00000100		;testing x2
+	beq MakeX2One			;if 0, make 1
+	;if here, clear x2
+	bic r1, #2_00000100		;clear her
+	b OrGate				;OR new value with x1
+MakeX2One
+	orr r1, #2_00000100		;put inverted x2 back
+	b OrGate				;OR new value with x1
+OrGate
+	tst r1, #2_00000110		;test new x2 and x1
+	beq BothZero			;branch if both are 0
+	orr r2, #2_00000100		;if here make y2 = 1
+	b Y2Done
+BothZero
+	bic r2, #2_00000100		;clear y2
+Y2Done
+	
+
+	 
+Y1Change
+	;x1 set y1
+	;the easy one
+	tst r1, #2_00000010		;check value of x1
+	beq Y1Zero				;if zero make y1 zero
+	orr r2, #2_00000010		;if here, x1 = 1 = y1
+	b Y1Done
+Y1Zero
+	bic r2, #2_00000010		;x1 = 0 = y1
+Y1Done
+
+	
+Y0Change
+	;x1 xor-ed with x0
+	;the slightly less easy one
+	;x1 and not x0 OR not x1 and x0
+	tst r1, #2_00000010		;check value of x1
+	beq X0Check				;if x1 is 0, see if x0 is 1
+	;if here, x1 = 1
+	tst r1, #2_00000001		;test value of x0
+	beq SetY0				;if x0 is 0, can set y0
+	b ClearY0				;if not, 
+X0Check
+	tst r1, #2_00000001		;check if X0 is 1
+	bne SetY0				;if x1 is 1, set y0
+	;if here, clear y0
+	b ClearY0
+SetY0
+	orr r2, #2_00000001		;make y0 = 1
+	b Y0Done
+ClearY0
+	bic r2, #2_00000001		;clear y0
+Y0Done
+
+	
+	;Saving y value
+	ldr r0, =Y_value
+	strb r2, [r0]
+
+	b .
+
+;using Dr. G's example from the video
+;X_value dcb 2_01110111 ;0x77 in hex
+;x7 = 0
+;x6 = 1
+;x5 = 1
+;x4 = 1
+;x3 = 0
+;x2 = 1
+;x1 = 1
+;x0 = 1
+X_value dcb 2_11111101
+;X_value dcb 2_10000011
+
+	AREA MyData, DATA
+Y_value dcb 0		;where result will be stored
+	
+
+	END
