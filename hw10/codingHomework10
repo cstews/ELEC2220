@@ -1,0 +1,341 @@
+;Courtney Stewart
+;ELEC2220
+;Coding Homework 10
+
+		
+	AREA blink,CODE
+	ENTRY
+	EXPORT __main
+	INCLUDE Equates.s			;include all EQU items to clean up code a lil
+	EXPORT EXTI0_IRQHandler		;so interrupt routine will actually be called
+		
+__main 
+	bl LEDSetup			;set up lights
+	bl buttonSetup		;set up button
+	bl EXTI_init		;set up button to trigger EXTI0
+	cpsie	i			;enable interrupts apparently
+						;I actually don't know if I need this but better
+						;safe than sorry
+						
+	ldr r0, =MODE		;instantiate MODE value
+	mov r1, #0
+	str r1, [r0]
+		
+modeCheck
+	ldr r0, =MODE
+	ldr r1, [r0]		;put MODE into r1
+	
+	;check to see where to go
+	cmp r1, #0
+	beq ModeZero		;if MODE = 0
+	
+	cmp r1, #1
+	beq ModeOne			;if MODE = 1
+	
+	cmp r1, #2
+	beq ModeTwo			;if MODE = 2
+	
+	cmp r1, #3
+	beq ModeThree		;if MODE = 3
+	
+	b modeCheck
+	
+	
+	
+ModeZero
+	bl allOff			;turn all off
+	bl blueOn			;turn on just blue light
+	b modeCheck			
+	
+
+ModeOne
+	bl blueOff			;blue light comes off
+	bl orangeOn			;orange light comes on
+	bl Delay
+	bl redOn			;red comes on
+	bl Delay			;wait before going off
+	bl redOff			;red goes off
+	b modeCheck
+	
+	
+ModeTwo
+	bl redOn			;turn red light on
+	bl orangeOff		;turn off orange light
+	bl blueOff			;turn off blue light
+	bl greenOff			;turn off green light
+	b modeCheck
+
+	
+ModeThree
+	bl allOn			;turn all lights on
+	b modeCheck
+	
+
+
+
+;delay loop	
+Delay
+	push {r0}			;save whatever was in r0 to the stack
+	mov r0, #0x300000	;big number
+subLoop
+	subs r0, #1
+	bne subLoop			;if not 1, keep subtracting
+	pop {r0}			;when done pop r0 back
+	bx LR				;return back
+
+
+
+;-------------LIGHTS ON SUBROUTINES-------------------------------
+;subroutine to turn on green light		
+greenOn	PROC
+	ldr r0, =GPIOD
+	ldrh r1, [r0, #ODR]		;store updated ODR
+	orr r1, #0x1000			;bit 12 should be set to one
+	strh r1, [r0, #ODR]		;store updated ODR
+	bx LR
+	ENDP
+		
+;subroutine to turn on orange light		
+orangeOn PROC
+	ldr r0, =GPIOD
+	ldrh r1, [r0, #ODR]		;get ODR
+	orr r1, #0x2000			;bit 13 should be set to one
+	strh r1, [r0, #ODR]		;store updated ODR
+	bx LR
+	ENDP
+	
+;subroutine to turn on red light		
+redOn PROC
+	ldr r0, =GPIOD
+	ldrh r1, [r0, #ODR]		;get ODR
+	orr r1, #0x4000			;bit 14 should be set to one
+	strh r1, [r0, #ODR]		;store updated ODR
+	bx LR
+	ENDP
+		
+;subroutine to turn on blue light		
+blueOn PROC
+	ldr r0, =GPIOD
+	ldrh r1, [r0, #ODR]		;get ODR
+	orr r1, #0x8000			;bit 15 should be set to one
+	strh r1, [r0, #ODR]		;store updated ODR
+	bx LR
+	ENDP
+	
+;-----------------LIGHTS OFF SUBROUTINES--------------------------------
+;subroutine to turn off green light
+greenOff PROC
+	ldr r0,=GPIOD
+	ldrh r1,[r0,#ODR]		;get ODR
+	bic r1, #0x1000 		;bit 12 = 0
+	strh r1,[r0,#ODR]		;update ODR
+	bx LR
+	ENDP
+
+
+;subroutine to turn off orange light		
+orangeOff PROC
+	ldr r0, =GPIOD
+	ldrh r1, [r0, #ODR]		;get ODR
+	bic r1, #0x2000			;bit 13 = 0
+	strh r1, [r0, #ODR]		;store updated ODR
+	bx LR
+	ENDP
+
+
+;subroutine to turn off red light		
+redOff PROC
+	ldr r0, =GPIOD
+	ldrh r1, [r0, #ODR]		;get ODR
+	bic r1, #0x4000			;bit 14 = 0
+	strh r1, [r0, #ODR]		;store updated ODR
+	bx LR
+	ENDP
+		
+;subroutine to turn off blue light		
+blueOff PROC
+	ldr r0, =GPIOD
+	ldrh r1, [r0, #ODR]		;get ODR
+	bic r1, #0x8000			;bit 15 = 0
+	strh r1, [r0, #ODR]		;store updated ODR
+	bx LR
+	ENDP
+
+
+;subroutine to turn on the lights
+;it's PD15-12 according to the manual
+allOn PROC
+	ldr r0,=GPIOD
+	ldrh r1,[r0,#ODR];get ODR
+	orr r1, #0xF000 ;bit 15-12 = 1 (turns on all lights)
+	strh r1,[r0,#ODR];update ODR
+	bx LR
+	ENDP
+
+;subroutine to turn off the lights
+;it's PD15-12 according to the manual
+allOff PROC
+	ldr r0,=GPIOD
+	ldrh r1,[r0,#ODR];get ODR
+	bic r1, #0xF000 ;bit 15-12 = 0 (turns off all lights)
+	strh r1,[r0,#ODR];update ODR
+	bx LR
+	ENDP
+
+;---------------------------------------------------------------------------------
+;SETUP SUBROUTINES
+;----------------------------------------------------------------------------------
+
+;sets up all four LEDs (PD15-12) as output and turns them off
+LEDSetup PROC
+	push {r0,r1} ;save the registers
+	
+	;enable the GPIOD clock
+	;each GPIO has its own clock bit to set.
+	ldr r0, =RCC ;RCC register block
+	ldr r1,[r0,#AHB1ENR] ;read RCC_AHB1ENR
+	orr r1,#0x08 ;enable GPIOD clock 
+	str r1,[r0,#AHB1ENR] ;rewrite RCC_AHB1ENR with clock value updated
+	
+
+	;PD15-PD12 are outputs we're using, as that's the lights
+	ldr r0, =GPIOD ;GPIOD register block location
+	ldr r1,[r0,#MODER] ;current mode register
+	;PD15 - bits 31 and 30
+	;PD14 - bits 29 and 28
+	;PD15 - bits 27 and 26
+	;PD14 - bits 25 and 24
+	;output is bits 01 for each
+	;so we want to have bits 31, 29, 27, 25 clear
+	;and bits 30, 28, 26, 24 set
+	bic r1, #0xAA000000 ;clears as described above
+	orr r1, #0x55000000 ;sets as described above
+	str r1,[r0,#MODER] ;update mode register with new value
+	
+	;turn the LEDs off
+	ldrh r1, [r0,#ODR] ;read ODR for GPIOD (since r0 is the base address of GPIOD)
+	bic r1,#0xF000 ;PD15-12 are cleared (off) (this is bits 15-12)
+	strh r1, [r0,#ODR] ;overwrite with new ODR
+	
+	;now return
+	pop {r0,r1} ;restore those registers
+	bx LR			;return
+	ENDP
+	
+;------------------------------------------------------------------------------	
+	
+;sets up the push button input
+buttonSetup	PROC
+	push {r0,r1} ;save the registers
+	
+	;enable the GPIOA clock
+	ldr r0, =RCC ;RCC register block
+	ldr r1,[r0,#AHB1ENR] ;read RCC_AHB1ENR
+	orr r1,#0x01 ;enable GPIOA clock 
+	str r1,[r0,#AHB1ENR] ;rewrite RCC_AHB1ENR with clock value updated
+	
+	;P0 in input
+	ldr r0, =GPIOA ;GPIOD register block location
+	ldr r1,[r0,#MODER] ;current mode register
+	;PA0 - bits 0 and 1
+	;inputs have both mode bits 00
+	bic r1, #0x03 ;clears bits 1 and 0
+	str r1,[r0,#MODER] ;update mode register with new value
+	
+	;now return
+	pop {r0,r1} ;restore those registers
+	bx LR			;return
+	ENDP
+	
+;--------------------------------------------------------------------------	
+		
+; Interrupt on rising edge of button press on PA0
+;   Triggers on EXTI0 interrupt
+;   Increments global variable Pattern: 0-1-2-0-1-2....
+EXTI0_IRQHandler
+		push	{lr}
+
+	; Switch debounce delay
+		ldr		r0,=500000	;delay for switch debounce
+Bounce	subs	r0,#1		;delay
+		bne		Bounce		;delay
+
+		; Verify that it was a 0-to-1 transition on PA0
+		ldr		r0,=GPIOA
+		ldrh	r1,[r0,#IDR] ;check button on PA0
+		tst		r1,#0x01	;if 1-to-0 transition: PA0 = 0
+		bne		IRQexit		;ignore bounce on 1-to-0 transition 
+							;this skips next part if read a 1
+
+;The actual thing the interrupt does (change the MODE)
+	ldr r0, =MODE
+	ldr r1, [r0]
+	add r1, #1
+	cmp r1, #3	;if it's above 3, reset to 0
+	ble StoreMode
+	mov r1, #0	;resets to 0 if larger than 2
+StoreMode
+	str r1, [r0]	
+	
+;;;Now prep to go back from interrupt
+IRQexit
+    ; Reset interrupt pending bit
+		ldr		r0,=EXTI	;point to EXTI register base address
+		ldr		r1,[r0,#PR]	;reset EXTI0 pending bit (write 1 to it)
+		orr		r1,#0x01
+		str		r1,[r0,#PR]
+
+	; Reset NVIC interrupt pending bit (in case triggered by bounce)
+		ldr		r0,=NVIC_ICPR0   	;Clear interrupt-Pending Register
+		mov		r1,#0x40			;EXTI0 = bit 6
+		str		r1,[r0]				;Clear EXTI0 pending bit
+
+		pop		{lr}
+		bx		lr			;return from interrupt
+
+;-------------------------------------------------------------------------------
+
+;Initialize EXTI0 interrupt via PA0 = button
+EXTI_init
+	;select PA0 as EXTI0
+	ldr		r1,=SYSCFG
+	ldrh	r2,[r1,#EXTICR1]	;EXTI priorities for EXTI0
+	bic		r2,#0x0f			;Bits 3-0 = 0000 to select PA0 = EXTI0
+	strh	r2,[r1,#EXTICR1]	;EXTI priorities for EXTI0
+
+	;configure EXTI0 as rising edge triggered
+	ldr		r1,=EXTI
+	ldr		r2,[r1,#FTSR]		;Select falling edge trigger
+	orr		r2,#1				;bit #0 for EXTI0
+	str		r2,[r1,#FTSR]	
+
+	ldr		r2,[r1,#PR]	
+	orr		r2,#1				
+	str		r2,[r1,#PR]			;Clear any pending event
+
+	ldr		r2,[r1,#IMR]	
+	orr		r2,#1				
+	str		r2,[r1,#IMR]		;Enable EXTI0
+
+	;configure NVIC to enable EXTI0 as priority 1
+	ldr		r1,=NVIC_ISER0
+	ldr		r2, [r1]
+	orr		r2,#0x40			;EXTI0 is IRQ 6
+	str		r2,[r1]				;Set enable IRQ 6
+
+	ldr		r1,=NVIC_IPR1
+	ldr		r2, [r1]
+	orr		r2,#0x00100000		;Make EXTI0 priority 1
+	str		r2,[r1]				;write IPR1 3rd byte
+
+	bx		LR					;return
+
+;------------------------------------------------------------------------
+
+	AREA MyInfo, DATA
+	EXPORT MODE
+
+MODE	space 4				;keeps track of mode number
+
+
+	END
