@@ -1,0 +1,64 @@
+;Courtney Stewart
+;ELEC2220
+;Coding Homework 6 Question 4
+
+	AREA RESET, CODE
+	THUMB
+	ENTRY
+
+Main
+	;takes int called Packed and breaks down into array of bytes called Values
+
+FirstValue
+	ldr r0, =Packed			;load in Packed array
+	ldr r1, [r0], #4		;load in value next value
+	
+	lsr r2, r1, #28			;shiift wanted value all the way to the right
+	and r2, #0x0F			;get rid of unwanted values
+	
+	ldr r4, =Values			;load in Values array
+	strb r2, [r4], #1		;store value in Values
+	
+SecondValue
+	lsr r2, r1, #24			;shiift wanted value all the way to the right
+	and r2, #0x0F			;get rid of unwanted values
+	strb r2, [r4], #1		;store in Values array
+	
+ThirdValue
+	lsr r2, r1, #20			;shiift wanted value all the way to the right
+	and r2, #0x0F			;get rid of unwanted values
+	strb r2, [r4], #1		;store in Values array
+	
+FourthValue
+	lsr r2, r1, #16			;shiift wanted value all the way to the right
+	and r2, #0x0F			;get rid of unwanted values
+	strb r2, [r4], #1		;store in Values array
+
+FifthValue
+	lsr r2, r1, #12			;shiift wanted value all the way to the right
+	and r2, #0x0F			;get rid of unwanted values
+	strb r2, [r4], #1		;store in Values array
+
+SixthValue
+	lsr r2, r1, #8			;shiift wanted value all the way to the right
+	and r2, #0x0F			;get rid of unwanted values
+	strb r2, [r4], #1		;store in Values array
+
+SeventhValue
+	lsr r2, r1, #4			;shiift wanted value all the way to the right
+	and r2, #0x0F			;get rid of unwanted values
+	strb r2, [r4], #1		;store in Values array
+
+EighthValue
+	ldr r1, =Packed			;load in og array again
+	ldrb r2, [r1]			;load in value
+	and r2, #0x0F			;get rid of unwanted values
+	strb r2, [r4], #1		;store in Values array
+	
+	b .
+	
+	AREA MyData, DATA
+Packed dcd 0x82761534
+Values dcb 0, 0, 0, 0, 0, 0, 0, 0
+
+	END
