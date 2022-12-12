@@ -1,0 +1,47 @@
+;Courtney Stewart
+;ELEC2220
+;Homework 4 Coding Question 2
+
+	AREA RESET, CODE
+	THUMB
+	ENTRY
+Main
+
+	;initialize counter to 0
+	mov r1, #0
+
+	;get starting address of Info3
+	ldr r0, =Info3
+
+CounterLoop
+	;read in next value from Info3
+	ldrb r2, [r0]
+	
+	;compare counter register to 4
+	cmp r1, #4
+	
+	;if greater than or equal to 4, exit
+	bge doneCounting
+
+	;add 7 to value
+	add r2, #7
+
+	;store back into its original address
+	strb r2, [r0], #1
+
+	;increment counter
+	add r1, #1
+
+	;check if counter is greater than or equal to 4
+	b CounterLoop
+
+	;if done counting, branch here
+doneCounting
+	b .
+	
+
+
+	AREA MyData, DATA
+Info3 dcb 0x01, 0x02, 0x03, 0x04, 0x05
+
+	END
