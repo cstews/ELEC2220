@@ -1,0 +1,973 @@
+;Courtney Stewart
+;ELEC2220
+;Final project
+
+;As far as difficulties with the assignment, I coudn't seem to get my double button
+;presses to be detected to make the morse code work. Independently of that I think the
+;logic checks out for getting the values to flash correctly. 
+
+	AREA blink, CODE, READONLY
+	ENTRY
+	EXPORT __main
+	INCLUDE Equates.s				;include equates file for offsets
+	EXPORT EXTI0_IRQHandler			;export button handler
+	EXPORT TIM4_IRQHandler			;export timer handler
+		
+__main
+	bl LEDSetup			;set up lights
+	bl buttonSetup		;set up button
+	bl interrupt_init	;set up button to trigger EXTI0
+	bl TIM4_Init		;set up the timer interrupt
+	bl output_init		;set up GPIOD 12-15 for LEDs
+	cpsie i
+
+;instantiate counters from DATA section here
+;load in mode value
+	ldr r0, =MODE					;mode0 is lights off, just waiting
+	mov r1, #0						;mode1 blinks initials on blue light
+	str r1, [r0]					;mode2 blinks last 3 digits of banner ID on blue light
+	
+;load in checked value for letters
+	ldr r2, =checked
+	mov r3, #0x00008000
+	str r3, [r2]
+	
+;load in checked value for numbers	
+	ldr r7, =checkedNum
+	mov r8, #0x00008000
+	str r8, [r7]
+	
+;load in counter for zeros in morse code	
+	ldr r3, =zeroCount
+	mov r4, #0
+	str r4, [r3]
+	
+;load in speedOption counter
+	ldr r5, =speedOption			;keeps track of what speed we are on
+	mov r6, #0						;with 0 being 1, 1 being 3/4, 2 being 1/4
+	str r6, [r5]					;and 3 being 1/4 second
+
+;load in buttonPresses count
+	ldr r9, =buttonPresses			;keeps track of how many times a button was 
+	mov r10, #0						;pressed
+	str r10, [r9]					;tracked in EXTI0 handler
+
+	
+	b .
+
+;------------------------------------------------------------------------
+;blink the light with the timer
+TIM4_IRQHandler	PROC
+	
+	push	{lr}		
+	ldr		r0,=TIM4
+	ldr		r1,[r0,#SR]			;Read SR
+	bic		r1,#0x0001			;Clear UIF (flag)
+	str		r1,[r0,#SR]			;Update SR
+
+
+
+Cycles
+	ldr r0, =buttonPresses		;load in button presses
+	ldr r1, [r0]				;put in r1
+	cmp r1, #1					;check if button has been presses
+	beq cycleStart				;if so start cycle
+	cmp r1, #2					;check if 2nd time through
+	bge cycleReset				;reset cycle and change speed
+
+	b ExitTimer					;if here buttonPresses = 0, exit timer
+	
+	
+cycleStart
+	ldr r2, =cycles				;load in cycles
+	ldr r3, [r2]				;put in r3
+	
+	cmp r3, #3
+	bge cycleReset
+	
+	add r3, #1					;add 1 to cycles
+	str r3, [r2]				;store back
+	
+	b Cycles
+	
+
+cycleReset
+	ldr r2, =cycles				;load back in cycles
+	ldr r3, [r2]				;put in r3
+	cmp r3, #1					;check if button clicked on cycle 1
+	beq	secondCycle				;if it has, check for other button click
+	b skip						;if not, change speed and reset 
+	
+secondCycle
+	ldr r0, =buttonPresses		;load in button presses
+	ldr r1, [r0]				;put in r1
+	cmp r1, #1					;check if button has been pressed only once
+	beq incrementMode			;if increment mode
+	
+	
+skip
+	ldr r2, =cycles				;load in cycles
+	ldr r3, [r2]				;put in r3
+	mov r3, #0					;put in zero
+	str r3, [r2]				;store back
+	b speedMode
+	
+incrementMode
+	ldr r2, =cycles				;load in cycles
+	ldr r3, [r2]				;put in r3
+	mov r3, #0					;put in zero
+	str r3, [r2]				;store back
+
+	ldr r0,=MODE				;load in mode
+	ldr r1, [r0]				;put in r1
+	add r1, #1					;add 1 to mode
+	
+	cmp r1, #3					;check if need to reset mode
+	beq resetMode				;if so branch 
+	str r1, [r0]				;if not store mode value
+	b speedMode					;do applicable mode
+	
+resetMode	
+	ldr r0,=MODE				;load in mode
+	ldr r1, [r0]				;put in r1
+	mov r1, #0					;move in 0
+	str r1, [r0]				;store mode back
+
+
+speedMode
+	ldr r0, =speedOption		;load in speedOption
+	ldr r1, [r0]				;load into r1
+	
+		
+	cmp r1, #0					;check if speed option is 0
+	beq speed1Sec				;if so branch to 1 second loop
+	
+	cmp r1, #1					;check if speed option is 1
+	beq speed75Sec				;if so branch to 3/4 second loop
+	
+	cmp r1, #2					;check if speed option is 2
+	beq speedHalfSec			;if so branch to 1/2 second loop
+	
+	cmp r1, #3					;check if speed options is 3
+	beq speedQuarterSec			;if so branch to 1/4 second loop
+	
+	;if here, not any speed option so need to reset
+	ldr r0, =speedOption		;load in speedOption
+	ldrb r1, [r0]				;load into r1
+	mov r1, #0					;reset speedOption
+	strb r1, [r0]				;store back
+	
+	b ExitTimer					;branch back and check speed
+
+speed1Sec
+	bl speed1Second					;branch to subroutine for speed 1
+	b ExitTimer						;exit
+	
+speed75Sec
+	bl speed75Second				;branch to subroutine for speed 3/4 second
+	b ExitTimer						;exit
+	
+speedHalfSec
+	bl speedHalfSecond				;branch to subroutine for speed 1/2 second
+	b ExitTimer						;exit
+	
+speedQuarterSec
+	bl speedQuarterSecond			;branch to subroutine for speed 1/4 second
+	b ExitTimer						;exit
+
+	
+	
+ExitTimer
+	pop		{lr}
+	bx		lr					;Return from interrupt
+	ENDP
+	
+;----------------------------------------------------------------
+
+speed1Second
+	push{lr}	;preserve lr
+
+
+	bl redOff
+;check what mode in
+	ldr r0, =MODE				;load in mode
+	ldr r1, [r0]				;put in r1
+	cmp r1, #1					;check if in mode1 (letter mode)
+	beq letters1Sec				;if so, blink initials 
+	cmp r1, #2					;check if in mode2 (numbers mode)
+	beq numbers1Sec				;if so, blink numbers
+	
+	
+	
+	b exitSub1					;if here in Mode 0, need to exit
+	
+	
+
+letters1Sec
+	ldr r0, =letter0			;load address of letter into r0
+	push{r0}					;push onto stack
+	bl letter					;call letter subroutine
+	
+	ldr r0, =letter1			;load address of letter into r0
+	push{r0}					;push onto stack
+	bl letter					;call letter subroutine
+	
+	ldr r0, =letter2			;load address of letter into r0
+	push{r0}					;push onto stack
+	bl letter					;call letter subroutine
+	
+	ldr r0, =letter3			;load address of letter into r0
+	push{r0}					;push onto stack
+	bl letter					;call letter subroutine
+
+	b speed1					;branch to timer thing	
+
+numbers1Sec	
+	ldr r0, =num0				;load address of num into r0
+	push{r0}					;push onto stack
+	bl num						;call num subroutine
+	
+	ldr r0, =num1				;load address of num into r0
+	push{r0}					;push onto stack
+	bl num						;call num subroutine
+
+	ldr r0, =num2				;load address of num into r0
+	push{r0}					;push onto stack
+	bl num						;call num subroutine
+
+
+speed1
+	mov r8, #0					;r8 will be counter to do things
+speed1Timer
+	cmp r8, #3					;check if counter is at 3
+	beq exitSub1				;if so, ready to do thing again
+	add r8, #1					;if here not 3, add 1
+	b speed1Timer				;branch back to counter check
+
+exitSub1
+	pop{lr}						;pop lr back
+	bx lr						;exit
+	
+	LTORG
+	
+	
+;-----------------3/4 second stuff-----------------------------------------	
+speed75Second
+	push{lr}					;preserve lr
+	
+speed75SecondStart	
+	;green light should be on
+	bl redOff
+	bl orangeOff
+	bl greenOn
+	
+	;check what mode in
+	ldr r0, =MODE				;load in mode
+	ldrb r1, [r0]				;put in r1
+	cmp r1, #1					;check if in mode1 (letter mode)
+	beq letters75Sec			;if so, blink initials 
+	cmp r1, #2					;check if in mode2 (numbers mode)
+	beq numbers75Sec			;if so, blink numbers
+	
+	b exitSub75					;if here in Mode 0, need to exit
+
+	
+letters75Sec
+	ldr r0, =letter0			;load address of letter into r0
+	push{r0}					;push onto stack
+	bl letter					;call letter subroutine
+	
+	ldr r0, =letter1			;load address of letter into r0
+	push{r0}					;push onto stack
+	bl letter					;call letter subroutine
+	
+	ldr r0, =letter2			;load address of letter into r0
+	push{r0}					;push onto stack
+	bl letter					;call letter subroutine
+	
+	ldr r0, =letter3			;load address of letter into r0
+	push{r0}					;push onto stack
+	bl letter					;call letter subroutine
+
+	b speed75					;branch to timer thing	
+
+numbers75Sec	
+	ldr r0, =num0				;load address of num into r0
+	push{r0}					;push onto stack
+	bl num						;call num subroutine
+	
+	ldr r0, =num1				;load address of num into r0
+	push{r0}					;push onto stack
+	bl num						;call num subroutine
+
+	ldr r0, =num2				;load address of num into r0
+	push{r0}					;push onto stack
+	bl num						;call num subroutine
+
+
+speed75
+	mov r8, #0					;r8 will be counter to do things
+speed75Timer
+	cmp r8, #2					;check if counter is at 2
+	beq exitSub75				;if so, ready to do thing again
+	add r8, #1					;if here not 2, add 1
+	b speed75Timer				;branch back to counter check
+	
+	
+exitSub75
+	pop{lr}						;pop lr back
+	bx lr						;exit
+
+;----------------1/2 second stuff------------------------------------------	
+speedHalfSecond
+	push{lr}					;preserve lr
+	
+	;orange light should be on
+	bl greenOff
+	bl redOff
+	bl orangeOn
+	
+	;check what mode in
+	ldr r0, =MODE				;load in mode
+	ldrb r1, [r0]				;put in r1
+	cmp r1, #1					;check if in mode1 (letter mode)
+	beq lettersHalfSec			;if so, blink initials 
+	cmp r1, #2					;check if in mode2 (numbers mode)
+	beq numbersHalfSec			;if so, blink numbers
+	
+	
+	b exit50Sub					;if here in Mode 0, exit subroutine
+	
+	
+	
+lettersHalfSec
+	ldr r0, =letter0			;load address of letter into r0
+	push{r0}					;push onto stack
+	bl letter					;call letter subroutine
+	
+	ldr r0, =letter1			;load address of letter into r0
+	push{r0}					;push onto stack
+	bl letter					;call letter subroutine
+	
+	ldr r0, =letter2			;load address of letter into r0
+	push{r0}					;push onto stack
+	bl letter					;call letter subroutine
+	
+	ldr r0, =letter3			;load address of letter into r0
+	push{r0}					;push onto stack
+	bl letter					;call letter subroutine
+
+	b speedHalf					;branch to timer thing	
+
+numbersHalfSec	
+	ldr r0, =num0				;load address of num into r0
+	push{r0}					;push onto stack
+	bl num						;call num subroutine
+	
+	ldr r0, =num1				;load address of num into r0
+	push{r0}					;push onto stack
+	bl num						;call num subroutine
+
+	ldr r0, =num2				;load address of num into r0
+	push{r0}					;push onto stack
+	bl num						;call num subroutine
+	
+	
+speedHalf	
+	mov r8, #0					;r8 will be counter to do things
+speedHalfTimer
+	cmp r8, #1					;check if counter is 1
+	beq exit50Sub				;if so, ready to do thing again
+	add r8, #1					;if here not 1, add 1
+	b speedHalfTimer			;branch back to counter check
+
+exit50Sub
+	pop{lr}						;pop lr back
+	bx lr						;exit
+			
+
+;----------------1/4 second stuff------------------------------------------
+speedQuarterSecond
+	push{lr}					;preserve LR
+	;red light should be on
+	bl orangeOff
+	bl greenOff
+	bl redOn
+	;no timers needed let's go
+	;check what mode in
+	ldr r0, =MODE				;load in mode
+	ldrb r1, [r0]				;put in r1
+	cmp r1, #1					;check if in mode1 (letter mode)
+	beq lettersQuarterSec		;if so, blink initials 
+	cmp r1, #2					;check if in mode2 (numbers mode)
+	beq numbersQuarterSec		;if so, blink numbers
+	
+	b exit25Sub					;if here mode is 0, exit sub
+	
+lettersQuarterSec
+	ldr r0, =letter0			;load address of letter into r0
+	push{r0}					;push onto stack
+	bl letter					;call letter subroutine
+	
+	ldr r0, =letter1			;load address of letter into r0
+	push{r0}					;push onto stack
+	bl letter					;call letter subroutine
+	
+	ldr r0, =letter2			;load address of letter into r0
+	push{r0}					;push onto stack
+	bl letter					;call letter subroutine
+	
+	ldr r0, =letter3			;load address of letter into r0
+	push{r0}					;push onto stack
+	bl letter					;call letter subroutine
+	
+	b exit25Sub					;when done branch back to check mode 
+
+numbersQuarterSec						
+	ldr r0, =num0				;load address of num into r0
+	push{r0}					;push onto stack
+	bl num						;call num subroutine
+	
+	ldr r0, =num1				;load address of num into r0
+	push{r0}					;push onto stack
+	bl num						;call num subroutine
+
+	ldr r0, =num2				;load address of num into r0
+	push{r0}					;push onto stack
+	bl num						;call num subroutine
+	
+	b exit25Sub					;when done branch back to check mode 
+	
+exit25Sub
+	pop{lr}						;pop lr back
+	bx lr						;exit	
+
+
+;==================================================================
+;subroutine for letters in morse code
+letter PROC
+	pop{r0} 					;pop address into register
+	ldrh r1, [r0]				;load in value into r1
+	
+	push {lr}					;push link register to preserve it
+	
+letterStart
+	ldr r2, =checked			;load in checking value
+	ldrh r3, [r2]				;put into r3
+	
+	and r5, r3, r1			;and letter and checked value
+	cmp r5, #0				;compare value to zero
+	beq turnOff				;if zero, turn off light
+	b turnOn				;if here then value is 1
+	
+;for value being 0	
+turnOff
+;turn off blue light
+	bl blueOff	
+
+;shift checked value
+	ldr r0, =checked		;load in checking value to shift it
+	ldrh r1, [r0]			;put into r1
+	lsr r2, r1, #1			;shift right 1 and put in r2
+	strh r2, [r0]			;store value back into original spot
+	
+;deal with zero counter
+	ldr r0, =zeroCount		;load in zero counter
+	ldrh r1, [r0]			;put zero counter in r1
+	add r1, #1				;add 1 to zero count
+	cmp r1, #3				;check if greater than or equal to three
+	bge resetChecked		;if yes branch to reset checked number and leave
+	b letterStart			;if here not done with letter, loop back
+	
+	
+	;for value being 1
+turnOn
+;turn on blue light
+	bl blueOn
+
+;shift checked value
+	ldr r0, =checked		;load in checking value to shift it
+	ldrh r1, [r0]			;put into r1
+	lsr r2, r1, #1			;shift right 1 and put in r2
+	strh r2, [r0]			;store value back into original spot
+
+;reset zero count to 0
+	ldr r0, =zeroCount		;load in zero counter
+	ldrh r1, [r0]			;put zero counter in r1
+	mov r1, #0				;clear zero counter
+	strh r1, [r0]			;store back
+	
+;loop back
+	b letterStart			;loop back to finish letter0
+	
+	
+resetChecked
+	ldr r2, =checked		;load in checking value
+	ldrh r3, [r2]			;put into r3
+	mov r3, #0x1000			;reset checking value
+	strh r3, [r2]			;store back		
+		
+		
+	pop{lr}					;pop lr back
+	bx lr					;exit subroutine
+	ENDP
+;=====================================================================
+;subroutine for numbers in morse code
+num PROC
+	pop {r0}				;pop address into r0
+	ldr r1, [r0]			;load into r1
+	
+	push {lr}				;preserve lr
+
+numStart
+	ldr r2, =checkedNum		;load in checking value
+	ldr r3, [r2]			;put into r3
+
+
+	and r4, r1, r3			;and value for num0 and checking
+	cmp r4, #0				;check if zero
+	beq turnOffNum			;if zero turn off light
+	b turnOnNum				;if here value is 1, turn on
+	
+turnOffNum
+	;turn off blue light
+	bl blueOff	
+
+;shift checked value
+	ldr r0, =checkedNum		;load in checking value to shift it
+	ldr r1, [r0]			;put into r1
+	lsr r2, r1, #1			;shift right 1 and put in r2
+	str r2, [r0]			;store value back into original spot
+	
+;deal with zero counter
+	ldr r0, =zeroCount		;load in zero counter
+	ldr r1, [r0]			;put zero counter in r1
+	add r1, #1				;add 1 to zero count
+	cmp r1, #3				;check if greater than or equal to three
+	bge resetCheckedNum		;if yes branch to reset checked num to leave
+	b numStart				;if here not done with num, loop back
+	
+
+turnOnNum
+	;turn on blue light
+	bl blueOn
+
+;shift checked value
+	ldr r0, =checkedNum		;load in checking value to shift it
+	ldr r1, [r0]			;put into r1
+	lsr r2, r1, #1			;shift right 1 and put in r2
+	str r2, [r0]			;store value back into original spot
+
+;reset zero count to 0
+	ldr r0, =zeroCount		;load in zero counter
+	ldr r1, [r0]			;put zero counter in r1
+	mov r1, #0				;clear zero counter
+	str r1, [r0]			;store back
+	
+;loop back
+	b numStart				;loop back to finish num0
+	
+	
+	
+resetCheckedNum
+	ldr r2, =checkedNum		;load in checking value
+	ldr r3, [r2]			;put into r3
+	mov r3, #0x10000000		;reset checking value
+	str r3, [r2]			;store back		
+	
+	
+	pop{lr}					;pop lr back
+	bx lr					;exit subroutine
+	ENDP
+;============================================================================
+		
+;--------------------------------------------------------------------------		
+; Interrupt on rising edge of button press on PA0
+;   Triggers on EXTI0 interrupt
+EXTI0_IRQHandler PROC
+		push	{lr}
+
+	; Switch debounce delay
+		ldr		r0,=500000	;delay for switch debounce
+Bounce	subs	r0,#1		;delay
+		bne		Bounce		;delay
+
+		; Verify that it was a 0-to-1 transition on PA0
+		ldr		r0,=GPIOA
+		ldrh	r1,[r0,#IDR] ;check button on PA0
+		tst		r1,#0x01	;if 1-to-0 transition: PA0 = 0
+		bne		IRQexit		;ignore bounce on 1-to-0 transition 
+							;this skips next part if read a 1
+
+
+;Button pressing check
+	ldr r2, =speedOption			;load in speedOptions counter
+	ldr r3, [r2]					;stick in r3
+	add r3, #1						;add 1 since it's been pressed
+	cmp r3, #3						;check to see if it's over 2
+	ble storeOption					;if not over three, just store
+	mov r3, #0						;if 3 or more reset to 0
+storeOption
+	str r3, [r2]					;store back
+	
+
+	ldr r4, =buttonPresses			;load in button presses
+	ldr r5, [r4]					;put into r5
+	add r5, #1						;add 1 to presses
+	str r5, [r4]					;store back 
+	
+	
+	;ldr r4, =MODE					;load in mode
+	;ldr r5, [r4]					;put into r5
+	;add r5, #1						;add 1 to presses
+	;str r5, [r4]					;store back 
+	
+	
+	
+;KEEP BELOW THIS THE SAME!!!!!!!!!!!!!!!!!!!!!!!!!!!!	
+	
+;;;Now prep to go back from interrupt
+IRQexit
+    ; Reset interrupt pending bit
+		ldr		r0,=EXTI	;point to EXTI register base address
+		ldr		r1,[r0,#PR]	;reset EXTI0 pending bit (write 1 to it)
+		orr		r1,#0x01
+		str		r1,[r0,#PR]
+
+	; Reset NVIC interrupt pending bit (in case triggered by bounce)
+		ldr		r0,=NVIC_ICPR0   	;Clear interrupt-Pending Register
+		mov		r1,#0x40			;EXTI0 = bit 6
+		str		r1,[r0]				;Clear EXTI0 pending bit
+
+		pop		{lr}
+		bx		lr			;return from interrupt	
+		ENDP
+
+
+;-------------LIGHTS ON SUBROUTINES-------------------------------
+;subroutine to turn on green light		
+greenOn	PROC
+	push{lr}
+	ldr r0, =GPIOD
+	ldrh r1, [r0, #ODR]		;store updated ODR
+	orr r1, #0x1000			;bit 12 should be set to one
+	strh r1, [r0, #ODR]		;store updated ODR
+	pop{lr}
+	bx LR
+	ENDP
+		
+;subroutine to turn on orange light		
+orangeOn PROC
+	push{lr}
+	ldr r0, =GPIOD
+	ldrh r1, [r0, #ODR]		;get ODR
+	orr r1, #0x2000			;bit 13 should be set to one
+	strh r1, [r0, #ODR]		;store updated ODR
+	pop{lr}
+	bx LR
+	ENDP
+	
+;subroutine to turn on red light		
+redOn PROC
+	push{lr}
+	ldr r0, =GPIOD
+	ldrh r1, [r0, #ODR]		;get ODR
+	orr r1, #0x4000			;bit 14 should be set to one
+	strh r1, [r0, #ODR]		;store updated ODR
+	pop{lr}
+	bx LR
+	ENDP
+		
+;subroutine to turn on blue light		
+blueOn PROC
+	push{lr}
+	ldr r0, =GPIOD
+	ldrh r1, [r0, #ODR]		;get ODR
+	orr r1, #0x8000			;bit 15 should be set to one
+	strh r1, [r0, #ODR]		;store updated ODR
+	pop{lr}
+	bx LR
+	ENDP
+		
+;-----------------LIGHTS OFF SUBROUTINES--------------------------------
+;subroutine to turn off green light
+greenOff PROC
+	push{lr}
+	ldr r0,=GPIOD
+	ldrh r1,[r0,#ODR]		;get ODR
+	bic r1, #0x1000 		;bit 12 = 0
+	strh r1,[r0,#ODR]		;update ODR
+	pop{lr}
+	bx LR
+	ENDP
+
+
+;subroutine to turn off orange light		
+orangeOff PROC
+	push{lr}
+	ldr r0, =GPIOD
+	ldrh r1, [r0, #ODR]		;get ODR
+	bic r1, #0x2000			;bit 13 = 0
+	strh r1, [r0, #ODR]		;store updated ODR
+	pop{lr}
+	bx LR
+	ENDP
+
+
+;subroutine to turn off red light		
+redOff PROC
+	push{lr}
+	ldr r0, =GPIOD
+	ldrh r1, [r0, #ODR]		;get ODR
+	bic r1, #0x4000			;bit 14 = 0
+	strh r1, [r0, #ODR]		;store updated ODR
+	pop{lr}
+	bx LR
+	ENDP
+		
+;subroutine to turn off blue light		
+blueOff PROC
+	push{lr}
+	ldr r0, =GPIOD
+	ldrh r1, [r0, #ODR]		;get ODR
+	bic r1, #0x8000			;bit 15 = 0
+	strh r1, [r0, #ODR]		;store updated ODR
+	pop{lr}
+	bx LR
+	ENDP
+
+
+;subroutine to turn off the lights
+;it's PD15-12 according to the manual
+allOff PROC
+	push{lr}
+	ldr r0,=GPIOD
+	ldrh r1,[r0,#ODR];get ODR
+	bic r1, #0xF000 ;bit 15-12 = 0 (turns off all lights)
+	strh r1,[r0,#ODR];update ODR
+	pop{lr}
+	bx LR
+	ENDP			
+		
+;---------------------------------------------------------------------------------
+;SETUP SUBROUTINES
+;----------------------------------------------------------------------------------
+
+;sets up all four LEDs (PD15-12) as output and turns them off
+LEDSetup PROC
+	push {r0,r1} ;save the registers
+	
+	;enable the GPIOD clock
+	;each GPIO has its own clock bit to set.
+	ldr r0, =RCC ;RCC register block
+	ldr r1,[r0,#AHB1ENR] ;read RCC_AHB1ENR
+	orr r1,#0x08 ;enable GPIOD clock 
+	str r1,[r0,#AHB1ENR] ;rewrite RCC_AHB1ENR with clock value updated
+	
+
+	;PD15-PD12 are outputs we're using, as that's the lights
+	ldr r0, =GPIOD ;GPIOD register block location
+	ldr r1,[r0,#MODER] ;current mode register
+	;PD15 - bits 31 and 30
+	;PD14 - bits 29 and 28
+	;PD15 - bits 27 and 26
+	;PD14 - bits 25 and 24
+	;output is bits 01 for each
+	;so we want to have bits 31, 29, 27, 25 clear
+	;and bits 30, 28, 26, 24 set
+	bic r1, #0xAA000000 ;clears as described above
+	orr r1, #0x55000000 ;sets as described above
+	str r1,[r0,#MODER] ;update mode register with new value
+	
+	;turn the LEDs off
+	ldrh r1, [r0,#ODR] ;read ODR for GPIOD (since r0 is the base address of GPIOD)
+	bic r1,#0xF000 ;PD15-12 are cleared (off) (this is bits 15-12)
+	strh r1, [r0,#ODR] ;overwrite with new ODR
+	
+	;now return
+	pop {r0,r1} ;restore those registers
+	bx LR			;return
+	ENDP
+	
+;------------------------------------------------------------------------------	
+;sets up the push button input
+buttonSetup	PROC
+	push {r0,r1} ;save the registers
+	
+	;enable the GPIOA clock
+	ldr r0, =RCC ;RCC register block
+	ldr r1,[r0,#AHB1ENR] ;read RCC_AHB1ENR
+	orr r1,#0x01 ;enable GPIOA clock 
+	str r1,[r0,#AHB1ENR] ;rewrite RCC_AHB1ENR with clock value updated
+	
+	;P0 in input
+	ldr r0, =GPIOA ;GPIOD register block location
+	ldr r1,[r0,#MODER] ;current mode register
+	;PA0 - bits 0 and 1
+	;inputs have both mode bits 00
+	bic r1, #0x03 ;clears bits 1 and 0
+	str r1,[r0,#MODER] ;update mode register with new value
+	
+	;now return
+	pop {r0,r1} ;restore those registers
+	bx LR			;return
+	ENDP
+	
+;-------------------------------------------------------------------------------
+;Initialize EXTI0 interrupt via PA0 = button
+interrupt_init
+	push{lr}
+	;select PA0 as EXTI0
+	ldr		r1,=SYSCFG
+	ldrh	r2,[r1,#EXTICR1]	;EXTI priorities for EXTI0
+	bic		r2,#0x0f			;Bits 3-0 = 0000 to select PA0 = EXTI0
+	strh	r2,[r1,#EXTICR1]	;EXTI priorities for EXTI0
+
+	;configure EXTI0 as rising edge triggered
+	ldr		r1,=EXTI
+	ldr		r2,[r1,#FTSR]		;Select falling edge trigger
+	orr		r2,#1				;bit #0 for EXTI0
+	str		r2,[r1,#FTSR]	
+
+	ldr		r2,[r1,#PR]	
+	orr		r2,#1				
+	str		r2,[r1,#PR]			;Clear any pending event
+
+	ldr		r2,[r1,#IMR]	
+	orr		r2,#1				
+	str		r2,[r1,#IMR]		;Enable EXTI0
+
+	;configure NVIC to enable EXTI0 as priority 1
+	ldr		r1,=NVIC_ISER0
+	ldr		r2, [r1]
+	orr		r2,#0x40			;EXTI0 is IRQ 6
+	str		r2,[r1]				;Set enable IRQ 6
+
+	ldr		r1,=NVIC_IPR1
+	ldr		r2, [r1]
+	orr		r2,#0x00100000		;Make EXTI0 priority 1
+	str		r2,[r1]				;write IPR1 3rd byte
+	
+	pop{lr}
+
+	bx		LR					;return
+;------------------------------------------------------------------------
+;   Initialize TIM4
+TIM4_Init	PROC
+	push{lr}
+	;enable the clock to TIM4 
+	ldr		r0,=RCC				;Clock control
+	ldr		r1,[r0,#APB1ENR]	;APB1 clock enable bits
+	orr		r1,#TIM4EN			;Enable TIM4 clock
+	str		r1,[r0,#APB1ENR]	;Update APB1
+
+
+	ldr		r0,=TIM4			;TIM4 registers
+	mov		r1,#PSCVal			;Prescale for waveform generation
+	str		r1,[r0,#PSC]		;
+	mov		r1,#ARRVal			;Auto-Repeat for waveform generation
+	str		r1,[r0,#ARR]		;
+	mov		r1,#1				;Counter Enable (CEN)
+	str		r1,[r0,#CR1]		;Enable the counter
+	str		r1,[r0,#DIER]		;Enable the counter interrupt
+	
+	; Enable TIM4 interrupt in NVIC	
+	ldr		r0,=NVIC_ISER0		;NVIC_ISER0 enable registers
+	mov		r1,#1
+	lsl		r1,#TIM4_BIT		;TIM4 enable bit
+	str		r1,[r0,#TIM4_OFF]	;enable TIM4 interrupt
+	pop{lr}
+	bx		lr					;return
+	ENDP
+
+;---------------------------------------------------------------------
+
+output_init	PROC
+	push{lr}
+	ldr r0, =RCC				;load RCC to set up clock
+	ldr r1, [r0, #AHB1ENR]		;RCC offset for output
+	orr r1, #0x08				;enable GPIOD clock
+	str r1, [r0, #AHB1ENR]		;store back to update AHB1ENR
+	
+	ldr r0, =GPIOD				;load GPIOD to set up output
+	ldr r1, [r0, #MODER]		;offset GPIOD by MODER constant	
+	bic r1, #0xFF000000			;clear PD 15-12 bits 
+	orr r1, #0x55000000			;set PD 15-12 to use as outputs 
+	str r1, [r0, #MODER]		;update mode register
+
+	ldrh r1, [r0, #ODR]
+	bic r1, #0xF000				;clear the lights' ODR bits (turn them off)
+	strh r1, [r0, #ODR]
+	pop{lr}
+	bx LR
+	ENDP
+;------------------------------------------------------------------
+
+; GPIO initialization for button
+input_init PROC
+	push{lr}
+	ldr		r0,=RCC				;RCC register block
+	ldr		r1,[r0,#AHB1ENR]	;read RCC_AHB1ENR
+	orr		r1,#0x01			;enable GPIOA clock
+	str		r1,[r0,#AHB1ENR]	;update AHB1ENR
+
+	ldr		r0,=GPIOA			;GPIOA register block
+	ldr		r1,[r0,#MODER]		;current mode register
+	bic		r1,r1,#0x03			;MODER[1:0] = 00 for PA0 input
+	str		r1,[r0,#MODER]		;update mode register
+	pop{lr}
+	bx		lr					;return
+	ENDP		
+
+
+;letters in morse code
+	;C is -*-*
+;letterZero dcd 2_1110101110100000
+letter0 dcw 0xEBA0	
+	
+	;D is -**
+;letterOne dcd 2_1110101000000000
+letter1 dcw 0xEA00
+	
+	;R is *-*
+;letterTwo dcd 2_1011101000000000
+letter2 dcw 0xBA00
+	
+	;S is ***
+;letterThree dcd 2_1010100000000000
+letter3 dcw 0xA800
+
+
+;numbers in morse code
+	;5 is *****
+;numZero dcd 2_10101010100000000000000000000000
+num0 dcd 0xAA800000
+
+	
+	;2 is **---
+;numOne dcd 2_10101110111011100000000000000000
+num1 dcd 0xAEEE0000
+	
+	;0 is -----
+;numTwo dcd 2_11101110111011101110000000000000
+num2 dcd 0xEEEEE000
+
+	AREA info, DATA
+MODE	dcd 0x00000000				;keeps track of mode number
+
+checked dcw 0x8000					;for and-ing checking values for letters
+
+checkedNum dcd 0x10000000			;for and-ing checking values for letters
+
+zeroCount dcd 0x00					;keeps track of zeros in morse code
+	
+speedOption space 4					;keeps track of what speed we are on
+									;with 0 being 1, 1 being 3/4, 2 being 1/4
+									;and 3 being 1/4 second
+									
+buttonPresses dcd 0x00000000		;keeps track of how many button presses
+
+cycles dcd 0x00000000				;keeps track of interrupts for cycles
+	
+	END			
+	
