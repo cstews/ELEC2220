@@ -1,0 +1,280 @@
+;Courtney Stewart
+;ELEC2220
+;Coding Homework 9
+
+;this is for the clock setup when enabling the GPIO
+RCC EQU 0x40023800 		;base address for RCC
+AHB1ENR EQU 0x30 		;offset for this
+;this is for GPIO setup
+GPIOA EQU 0x40020000	;base address for PA# stuff
+GPIOD EQU 0x40020C00	;base address for PD# stuff
+MODER EQU 0x00 			;mode selection register offset (it's 0)
+IDR EQU 0x10			;offset for InputDR in a GPIOx array
+ODR EQU 0x14 			;offset for OutputDR in a GPIOx array
+		
+	AREA example,CODE
+	ENTRY
+	EXPORT __main
+		
+__main 
+;light and button setup
+	bl LEDSetup	
+	bl buttonSetup
+		
+	
+ModeZeroZero
+	mov r7, #0			;r7 is counter
+	bl greenOff			;start with all but blue off
+	bl redOff
+	bl orangeOff
+	
+ModeZero
+	bl checkButton		;check to see if button is pressed
+	ldr r0, =Mode
+	ldrb r1, [r0]
+	cmp r7, #1		;sees if Mode = 1
+	beq ModeOne			;if pressed, go to ModeOne
+	bl blueOn			;blue button should be on until button press
+	b ModeZero			;if not, loop back
+	
+ModeOne
+	bl blueOff			;blue light comes off
+	bl orangeOn			;orange light comes on
+	bl redOn			;red comes on
+	bl delayLoop		;wait before going off
+	bl delayLoop
+	bl checkButton
+	bl delayLoop
+	bl delayLoop
+	bl redOff			;this all is for red light to flash
+	bl delayLoop
+	bl checkButton
+	bl delayLoop
+	bl redOn
+	cmp r7, #2			;see if mode should advance
+	beq ModeTwo			;if so, branch there
+	bl checkButton		
+	b ModeOne			;if not, go back
+
+	
+ModeTwo
+	bl redOn			;turn red light on
+	bl orangeOff		;turn off orange light
+	cmp r7, #3			;see if mode should change
+	beq ModeThree
+	bl checkButton		;check to see if button is pressed
+	b ModeTwo			;if not, loop back
+
+	
+ModeThree
+	bl allOn			;turn all lights on
+	cmp r7, #4			;check mode
+	bge ModeZeroZero	;if pressed again, loop back to start
+	bl checkButton		;check to see if button is pressed
+	b ModeThree			;if not, loop back
+	
+
+
+;Subroutine to delay light flashing
+delayLoop PROC
+	push{r0}			;save whatever value was here
+	mov r0, #0xFFFF		;hopefully will take about half a second
+LoopForSub
+	subs r0, #1			;decrement by 1 and set flags
+	bne LoopForSub		;if not 1 loop back and subtract again
+	pop{r0}
+	bx LR
+	ENDP
+	
+
+;subroutine to check if PA0 pressed
+;stores 0 or 1 in ButtonPress (in DATA) if not pressed or pressed
+;changes r0 and r1
+checkButton	PROC
+	push{r0-r2}
+	ldr r0,=GPIOA
+	ldrh r1,[r0,#IDR]	;get GPIOA IDR
+	and r1, #0x01 		;clear all but bit 0
+	ldr r0, =previous
+	ldrb r2, [r0]		;put previous state in r2
+	cmp r1, r2			;check to see if previous state is same as current
+	beq buttonExit		;if same, exit
+	strb r1, [r0]		;if not, update previous state
+	cmp r1, #1
+	bne buttonExit		;only continue if r1 = 1
+	ldr r0, =Mode
+	ldrb r1, [r0]
+	add r7, #1
+	eor r1, #1
+	strb r1, [r0]
+	
+buttonExit
+	pop{r0-r2}
+	bx LR
+	ENDP
+		
+		
+;subroutine to turn on green light		
+greenOn	PROC
+	ldr r0, =GPIOD
+	ldrh r1, [r0, #ODR]		;store updated ODR
+	orr r1, #0x1000			;bit 12 should be set to one
+	strh r1, [r0, #ODR]		;store updated ODR
+	bx LR
+	ENDP
+		
+;subroutine to turn on orange light		
+orangeOn PROC
+	ldr r0, =GPIOD
+	ldrh r1, [r0, #ODR]		;get ODR
+	orr r1, #0x2000			;bit 13 should be set to one
+	strh r1, [r0, #ODR]		;store updated ODR
+	bx LR
+	ENDP
+	
+;subroutine to turn on red light		
+redOn PROC
+	ldr r0, =GPIOD
+	ldrh r1, [r0, #ODR]		;get ODR
+	orr r1, #0x4000			;bit 14 should be set to one
+	strh r1, [r0, #ODR]		;store updated ODR
+	bx LR
+	ENDP
+		
+;subroutine to turn on blue light		
+blueOn PROC
+	ldr r0, =GPIOD
+	ldrh r1, [r0, #ODR]		;get ODR
+	orr r1, #0x8000			;bit 15 should be set to one
+	strh r1, [r0, #ODR]		;store updated ODR
+	bx LR
+	ENDP
+	
+
+;subroutine to turn off green light
+greenOff PROC
+	ldr r0,=GPIOD
+	ldrh r1,[r0,#ODR]		;get ODR
+	bic r1, #0x1000 		;bit 12 = 0
+	strh r1,[r0,#ODR]		;update ODR
+	bx LR
+	ENDP
+
+
+;subroutine to turn off orange light		
+orangeOff PROC
+	ldr r0, =GPIOD
+	ldrh r1, [r0, #ODR]		;get ODR
+	bic r1, #0x2000			;bit 13 = 0
+	strh r1, [r0, #ODR]		;store updated ODR
+	bx LR
+	ENDP
+
+
+;subroutine to turn off red light		
+redOff PROC
+	ldr r0, =GPIOD
+	ldrh r1, [r0, #ODR]		;get ODR
+	bic r1, #0x4000			;bit 14 = 0
+	strh r1, [r0, #ODR]		;store updated ODR
+	bx LR
+	ENDP
+		
+;subroutine to turn off blue light		
+blueOff PROC
+	ldr r0, =GPIOD
+	ldrh r1, [r0, #ODR]		;get ODR
+	bic r1, #0x8000			;bit 15 = 0
+	strh r1, [r0, #ODR]		;store updated ODR
+	bx LR
+	ENDP
+
+
+;subroutine to turn on the lights
+;it's PD15-12 according to the manual
+allOn PROC
+	ldr r0,=GPIOD
+	ldrh r1,[r0,#ODR];get ODR
+	orr r1, #0xF000 ;bit 15-12 = 1 (turns on all lights)
+	strh r1,[r0,#ODR];update ODR
+	bx LR
+	ENDP
+
+;subroutine to turn off the lights
+;it's PD15-12 according to the manual
+allOff PROC
+	ldr r0,=GPIOD
+	ldrh r1,[r0,#ODR];get ODR
+	bic r1, #0xF000 ;bit 15-12 = 0 (turns off all lights)
+	strh r1,[r0,#ODR];update ODR
+	bx LR
+	ENDP
+
+
+
+;sets up all four LEDs (PD15-12) as output and turns them off
+LEDSetup PROC
+	push {r0,r1} ;save the registers
+	
+	;enable the GPIOD clock
+	;each GPIO has its own clock bit to set.
+	ldr r0, =RCC ;RCC register block
+	ldr r1,[r0,#AHB1ENR] ;read RCC_AHB1ENR
+	orr r1,#0x08 ;enable GPIOD clock 
+	str r1,[r0,#AHB1ENR] ;rewrite RCC_AHB1ENR with clock value updated
+	
+
+	;PD15-PD12 are outputs we're using, as that's the lights
+	ldr r0, =GPIOD ;GPIOD register block location
+	ldr r1,[r0,#MODER] ;current mode register
+	;PD15 - bits 31 and 30
+	;PD14 - bits 29 and 28
+	;PD15 - bits 27 and 26
+	;PD14 - bits 25 and 24
+	;output is bits 01 for each
+	;so we want to have bits 31, 29, 27, 25 clear
+	;and bits 30, 28, 26, 24 set
+	bic r1, #0xAA000000 ;clears as described above
+	orr r1, #0x55000000 ;sets as described above
+	str r1,[r0,#MODER] ;update mode register with new value
+	
+	;turn the LEDs off
+	ldrh r1, [r0,#ODR] ;read ODR for GPIOD (since r0 is the base address of GPIOD)
+	bic r1,#0xF000 ;PD15-12 are cleared (off) (this is bits 15-12)
+	strh r1, [r0,#ODR] ;overwrite with new ODR
+	
+	;now return
+	pop {r0,r1} ;restore those registers
+	bx LR			;return
+	ENDP
+	
+	
+;sets up the push button input
+buttonSetup	PROC
+	push {r0,r1} ;save the registers
+	
+	;enable the GPIOA clock
+	ldr r0, =RCC ;RCC register block
+	ldr r1,[r0,#AHB1ENR] ;read RCC_AHB1ENR
+	orr r1,#0x01 ;enable GPIOA clock 
+	str r1,[r0,#AHB1ENR] ;rewrite RCC_AHB1ENR with clock value updated
+	
+	;P0 in input
+	ldr r0, =GPIOA ;GPIOD register block location
+	ldr r1,[r0,#MODER] ;current mode register
+	;PA0 - bits 0 and 1
+	;inputs have both mode bits 00
+	bic r1, #0x03 ;clears bits 1 and 0
+	str r1,[r0,#MODER] ;update mode register with new value
+	
+	;now return
+	pop {r0,r1} ;restore those registers
+	bx LR			;return
+	ENDP
+
+	AREA MyInfo, DATA, READWRITE
+ButtonPress space 0			;tells if button pressed or not
+Mode dcb 0x00				;keeps track of mode number
+previous dcb 0x00			;keeps track of previous state
+
+	END
