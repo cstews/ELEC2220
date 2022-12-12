@@ -1,0 +1,50 @@
+;System Configuration Registers
+SYSCFG	EQU 0x40013800
+EXTICR1	EQU	0x08			;clock enables for GPIO ports
+	
+;External Interrupt Registers
+EXTI	EQU	0x40013C00
+IMR		EQU	0x00	;Interrupt Mask Register
+EMR		EQU	0x04	;Event Mask Register
+RTSR	EQU	0x08	;Rising Trigger Select
+FTSR	EQU	0x0C	;Falling Trigger Select
+SWIR	EQU	0x10	;Software Interrupt Event
+PR		EQU	0x14	;Pending Register
+
+RCC			EQU 0x40023800		;RCC base address
+APB1ENR		EQU	0x40			;APB1ENR offset	(Clock for timer)
+AHB1ENR 	EQU	0x30			;ABB1ENR offset (clock for GPIOD)
+TIM4EN		EQU	0x04			;Timer 4 enable = bit 2
+
+GPIOA	EQU 0x40020000		;base address for PA# stuff
+GPIOD	EQU	0x40020C00		;GPIOD base address
+MODER	EQU 0x00			;mode selection register
+IDR 	EQU 0x10			;input data register offset from base
+ODR		EQU 0x14			;output data register
+
+TIM4	EQU	0x40000800		;Timer 4 registers
+CR1		EQU	0x00			;Control register 1	
+DIER	EQU	0x0C			;DMA/interrupt enable register
+SR		EQU	0x10			;Status register
+PSC		EQU	0x28			;Prescaler
+ARR		EQU	0x2C			;Auto-Reload Register
+TIM4_BIT	EQU 30			;Bit# 30 in the above registers (30%32 = 30)
+TIM4_OFF	EQU 0			;Offset to ISER0/ICER0/ISPR0/ICPR0/IABR0 (30/32 = 0) x 4
+
+NVIC_ISER0	EQU	0xE000E100	;Interrupt Set-Enable (0-7)
+NVIC_ICER0	EQU	0xE000E180	;Interrupt Clear-Enable (0-7)
+NVIC_ISPR0	EQU	0xE000E200	;Interrupt Set-Pending (0-7)
+NVIC_ICPR0	EQU	0xE000E280	;Interrupt Clear-Pending (0-7)
+NVIC_IABR0	EQU	0xE000E300	;Interrupt Active Bit (0-7)
+NVIC_IPR1	EQU	0xE000E404	;Interrupt Priority (0-59)
+STIR		EQU	0xE000EF00	;Software Tigger Interrupt
+
+
+;prescale and Auto Reload Register are discussed in class 11 Nov
+;Hertz = cycles/second
+;kHz = 1000, MHz = 1000000, GHz = 1000000000
+;frequency of interrupt in Hertz = (clock frequency in Hertz)/((1+ARR)(1+PSC))
+PSCVal	EQU 999
+ARRVal EQU 3999
+
+	END
